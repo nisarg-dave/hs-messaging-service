@@ -35,5 +35,16 @@ func (h *MessageHandler) CreateMessage(c *echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, err.Error())
 	}
 
-	return c.JSON(http.StatusCreated, "Message created")
+	// Able to return the message since it is a pointer that is passed all the way down to the service and db layer and modfiied
+	// No need to get the message all the way back up to the handler to return it
+	return c.JSON(http.StatusCreated, message)
+}
+
+func (h *MessageHandler) MarkMessageAsRead(c *echo.Context) error {
+	messageID := c.Param("id")
+	err := h.messageService.MarkMessageAsRead(messageID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, "Message marked as read")
 }

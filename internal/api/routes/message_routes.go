@@ -9,5 +9,5 @@ import (
 func RegisterMessageRoutes(e *echo.Echo, messageHandler *handlers.MessageHandler) {
 	messageGroup := e.Group("/messages")
 	messageGroup.POST("", messageHandler.CreateMessage)
-	// messageGroup.PUT("/:id/read", handlers.MarkMessageAsRead)
+	messageGroup.PUT("/:id/read", messageHandler.MarkMessageAsRead)
 }	

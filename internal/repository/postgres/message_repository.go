@@ -25,3 +25,13 @@ func (r *MessageRepository) CreateMessage(message *domain.Message) error {
 	log.Printf("Inserted %d rows", result.RowsAffected)
 	return nil
 }
+
+func (r *MessageRepository) MarkMessageAsRead(messageID string) error {
+	result := r.db.Model(&domain.Message{}).Where("id = ?", messageID).Update("is_read", true)
+	if result.Error != nil {
+		return result.Error
+	}
+
+	log.Printf("Marked message as read: %s", messageID)
+	return nil
+}
