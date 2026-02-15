@@ -6,14 +6,8 @@ import (
 	"github.com/labstack/echo/v5"
 )
 
-func RegisterMessageRoutes(e *echo.Echo) {
+func RegisterMessageRoutes(e *echo.Echo, messageHandler *handlers.MessageHandler) {
 	messageGroup := e.Group("/messages")
-	messageGroup.POST("", handlers.CreateMessage)
-	messageGroup.PUT("/:id/read", handlers.MarkMessageAsRead)
-}
-
-func RegisterConversationRoutes(e *echo.Echo) {
-	conversationGroup := e.Group("/conversations")
-	conversationGroup.GET("", handlers.GetConversations)
-	conversationGroup.GET("/:id", handlers.GetConversation)
-}
+	messageGroup.POST("", messageHandler.CreateMessage)
+	// messageGroup.PUT("/:id/read", handlers.MarkMessageAsRead)
+}	
