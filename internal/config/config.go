@@ -7,6 +7,7 @@ import (
 
 type Config struct {
 	DatabaseURL string
+	ServerPort string
 }
 
 func Load() *Config {
@@ -15,8 +16,8 @@ func Load() *Config {
 	dbUser := os.Getenv("POSTGRES_USER")
 	dbPassword := os.Getenv("POSTGRES_PASSWORD")
 	dbName := os.Getenv("POSTGRES_DB")	
-
+	serverPort := os.Getenv("SERVER_PORT")
 
 	databaseURL := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable", host, dbUser, dbPassword, dbName, dbPort)
-	return &Config{DatabaseURL: databaseURL}
+	return &Config{DatabaseURL: databaseURL, ServerPort: serverPort}
 }

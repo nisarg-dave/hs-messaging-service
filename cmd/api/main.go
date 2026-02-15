@@ -26,6 +26,11 @@ func main() {
 	messageHandler := handlers.NewMessageHandler(messageService)
 
 	e := echo.New()
+
 	routes.RegisterMessageRoutes(e, messageHandler)
 	
+	log.Printf("Server started on port %s", config.ServerPort)
+	if err := e.Start(":" + config.ServerPort); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
+	}
 }
