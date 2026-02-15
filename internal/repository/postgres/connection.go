@@ -1,6 +1,8 @@
 package postgres
 
 import (
+	"fmt"
+
 	"hs-messaging-service/internal/config"
 	"hs-messaging-service/internal/domain"
 
@@ -19,6 +21,8 @@ func NewConnection(config *config.Config) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("Database connected successfully")
 
 	return db, nil
 }

@@ -1,12 +1,16 @@
 package main
 
 import (
+	"log"
+
 	"hs-messaging-service/internal/config"
 	"hs-messaging-service/internal/repository/postgres"
-	"log"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	godotenv.Load()
 	config := config.Load()
 	_, err := postgres.NewConnection(config)
 	if err != nil {
