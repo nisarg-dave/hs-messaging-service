@@ -42,9 +42,9 @@ func (h *MessageHandler) CreateMessage(c *echo.Context) error {
 
 func (h *MessageHandler) MarkMessageAsRead(c *echo.Context) error {
 	messageID := c.Param("id")
-	err := h.messageService.MarkMessageAsRead(messageID)
+	message, err := h.messageService.MarkMessageAsRead(messageID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, err.Error())
 	}
-	return c.JSON(http.StatusOK, "Message marked as read")
+	return c.JSON(http.StatusOK, message)
 }

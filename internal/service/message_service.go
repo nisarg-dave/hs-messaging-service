@@ -18,6 +18,10 @@ func (s *MessageService) CreateMessage(message *domain.Message) error {
 	return s.messageRepository.CreateMessage(message)
 }
 
-func (s *MessageService) MarkMessageAsRead(messageID string) error {
-	return s.messageRepository.MarkMessageAsRead(messageID)
+func (s *MessageService) MarkMessageAsRead(messageID string) (*domain.Message, error) {
+	message, err := s.messageRepository.MarkMessageAsRead(messageID)
+	if err != nil {
+		return nil, err
+	}
+	return message, nil
 }

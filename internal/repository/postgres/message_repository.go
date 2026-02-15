@@ -26,12 +26,20 @@ func (r *MessageRepository) CreateMessage(message *domain.Message) error {
 	return nil
 }
 
-func (r *MessageRepository) MarkMessageAsRead(messageID string) error {
+func (r *MessageRepository) MarkMessageAsRead(messageID string) (*domain.Message, error) {
 	result := r.db.Model(&domain.Message{}).Where("id = ?", messageID).Update("is_read", true)
 	if result.Error != nil {
-		return result.Error
+		return nil, result.Error
 	}
 
 	log.Printf("Marked message as read: %s", messageID)
-	return nil
+
+
+	message := new(domain.Message)
+	result = r.db.First(&message, "id = ?", messageID)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return message, nil
 }
