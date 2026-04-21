@@ -1,0 +1,45 @@
+---
+description: Go style and error-handling conventions
+globs: **/*.go
+alwaysApply: false
+---
+
+# Go conventions
+
+- Run `gofmt` and `go vet` before finishing a change.
+- Package names: short, lowercase, no underscores. Match directory.
+- Exported identifiers: `PascalCase` with a doc comment starting with the name.
+- Errors: return them, don't swallow. Wrap with context using `fmt.Errorf("doing X: %w", err)`.
+- No `panic` in request paths. `log.Fatal` only in `main`.
+- Prefer constructor functions (`NewFoo`) that return concrete types or interfaces as needed.
+
+## Example: error wrapping
+
+```go
+// BAD
+if err != nil {
+    return err
+}
+
+// GOOD
+if err != nil {
+    return fmt.Errorf("create message: %w", err)
+}
+```
+
+## Example: handler shape
+
+```go
+func (h *MessageHandler) CreateMessage(c echo.Context) error {
+    msg := new(domain.Message)
+    if err := c.Bind(msg); err != nil {
+        return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+    }
+    if err := h.messageService.CreateMessage(msg); err != nil {
+        return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+    }
+    return c.JSON(http.StatusCreated, msg)
+}
+```
+
+Don't return raw `error.Error()` strings as the top-level JSON body; wrap in an object so the shape is stable.
