@@ -1,0 +1,31 @@
+---
+description: Project overview, stack, and core workflow for hs-messaging-service
+alwaysApply: true
+---
+
+# hs-messaging-service
+
+Go HTTP service using Echo v5 + GORM + Postgres. Entry point is `cmd/api/main.go`.
+
+## Layered architecture (strict)
+
+`routes -> handlers -> service -> repository -> domain`
+
+- Handlers (`internal/api/handlers`): parse request, call service, return JSON. No DB calls.
+- Services (`internal/service`): business logic and validation. No Echo types.
+- Repositories (`internal/repository/postgres`): GORM queries only. No business rules.
+- Domain (`internal/domain`): structs with GORM + JSON tags. No behavior.
+
+## Workflow for new endpoints
+
+1. Add or update a domain model (register in `AutoMigrate` in `repository/postgres/connection.go`).
+2. Repository method -> service method -> handler -> route registration.
+3. Wire the handler + service + repo in `cmd/api/main.go`.
+
+## Commands
+
+- Run: `docker compose up -d && go run ./cmd/api`
+- Check: `go vet ./... && gofmt -l .`
+- Test: `go test ./...`
+
+Never commit `.env` or real secrets.

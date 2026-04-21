@@ -1,0 +1,24 @@
+---
+description: Enforce layer boundaries inside internal/
+globs: internal/**/*.go
+alwaysApply: false
+---
+
+# Layer boundaries
+
+Allowed imports per layer:
+
+| Layer | May import | Must not import |
+|-------|------------|-----------------|
+| `internal/api/handlers` | `internal/service`, `internal/domain`, `echo` | `internal/repository/*`, `gorm` |
+| `internal/api/routes` | `internal/api/handlers`, `echo` | service, repository, domain |
+| `internal/service` | `internal/repository/*`, `internal/domain` | `echo`, `net/http` |
+| `internal/repository/postgres` | `internal/domain`, `gorm` | `internal/service`, `echo` |
+| `internal/domain` | stdlib only (plus struct tags) | everything else |
+
+## Rules
+
+- Handlers return `echo.Context` JSON responses. They do not open transactions.
+- Services own validation and orchestration. If a service needs multiple repos, inject them via the constructor.
+- Repositories return `*domain.X` or `error`. They do not translate errors into HTTP codes.
+- When adding a new domain model, also register it in `AutoMigrate` in `internal/repository/postgres/connection.go`.
