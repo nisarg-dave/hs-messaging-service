@@ -20,7 +20,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	
+
 	messageRepository := postgres.NewMessageRepository(db)
 	messageService := service.NewMessageService(messageRepository)
 	messageHandler := handlers.NewMessageHandler(messageService)
@@ -28,7 +28,7 @@ func main() {
 	e := echo.New()
 
 	routes.RegisterMessageRoutes(e, messageHandler)
-	
+
 	log.Printf("Server started on port %s", config.ServerPort)
 	if err := e.Start(":" + config.ServerPort); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
