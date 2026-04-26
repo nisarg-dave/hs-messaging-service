@@ -34,7 +34,6 @@ func (r *MessageRepository) MarkMessageAsRead(messageID string) (*domain.Message
 
 	log.Printf("Marked message as read: %s", messageID)
 
-
 	message := new(domain.Message)
 	result = r.db.First(&message, "id = ?", messageID)
 	if result.Error != nil {

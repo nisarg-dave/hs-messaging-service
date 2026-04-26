@@ -10,4 +10,4 @@ func RegisterMessageRoutes(e *echo.Echo, messageHandler *handlers.MessageHandler
 	messageGroup := e.Group("/messages")
 	messageGroup.POST("", messageHandler.CreateMessage)
 	messageGroup.PATCH("/:id/read", messageHandler.MarkMessageAsRead)
-}	
+}

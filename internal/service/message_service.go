@@ -3,7 +3,7 @@ package service
 import (
 	"hs-messaging-service/internal/domain"
 	"hs-messaging-service/internal/repository/postgres"
-)	
+)
 
 type MessageService struct {
 	messageRepository *postgres.MessageRepository
