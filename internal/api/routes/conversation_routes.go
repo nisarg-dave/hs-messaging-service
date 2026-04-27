@@ -6,8 +6,8 @@ import (
 	"github.com/labstack/echo/v5"
 )
 
-func RegisterConversationRoutes(e *echo.Echo) {
+func RegisterConversationRoutes(e *echo.Echo, conversationHandler *handlers.ConversationHandler) {
 	conversationGroup := e.Group("/conversations")
-	conversationGroup.GET("", handlers.GetConversations)
-	conversationGroup.GET("/:id", handlers.GetConversation)
+	conversationGroup.GET("", conversationHandler.GetConversations)
+	conversationGroup.GET("/:userId", conversationHandler.GetConversation)
 }

@@ -25,9 +25,14 @@ func main() {
 	messageService := service.NewMessageService(messageRepository)
 	messageHandler := handlers.NewMessageHandler(messageService)
 
+	conversationRepository := postgres.NewConversationRepository(db)
+	conversationService := service.NewConversationService(conversationRepository)
+	conversationHandler := handlers.NewConversationHandler(conversationService)
+
 	e := echo.New()
 
 	routes.RegisterMessageRoutes(e, messageHandler)
+	routes.RegisterConversationRoutes(e, conversationHandler)
 
 	log.Printf("Server started on port %s", config.ServerPort)
 	if err := e.Start(":" + config.ServerPort); err != nil {
