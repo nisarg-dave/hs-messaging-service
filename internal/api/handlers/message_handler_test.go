@@ -60,6 +60,9 @@ func newTestContext(method, target, body string) (*echo.Context, *httptest.Respo
 	return c, rec
 }
 
+// fmt verbs in assertions: %v default formatting (errors); %d integers (status codes);
+// %q quoted strings (nice for empties/diffs).
+
 func TestMessageHandler_CreateMessage_Success(t *testing.T) {
 	fake := &fakeMessageService{}
 	h := NewMessageHandler(fake)

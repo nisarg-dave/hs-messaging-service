@@ -24,6 +24,20 @@ type conversationRow struct {
 }
 
 func (r *ConversationRepository) ListConversations(userID string) ([]domain.ConversationSummary, error) {
+	// Conversation list SQL uses CTEs (WITH …): named chunks run top-to-bottom.
+	//
+	// paired: every message involving this user (sender OR recipient); CASE maps each row’s
+	// peer to other_user so both directions share one thread key; keeps recipient_id and is_read
+	// for the unread tally.
+	//
+	// ranked: ROW_NUMBER per other_user ordered by newest first → rn == 1 is the latest message
+	// per 1:1 thread.
+	//
+	// Outer query: keeps only rn=1 (last preview) and attaches unread_count by counting rows in
+	// paired where same peer, recipient_id is you, and is_read is false.
+	//
+	// userID is passed four times below because ? placeholders are positional: same id fills
+	// CASE (sender check), WHERE sender, WHERE recipient, and unread recipient filter.
 	const query = `
 WITH paired AS (
     SELECT
@@ -59,12 +73,18 @@ ORDER BY r.created_at DESC
 `
 
 	var rows []conversationRow
+	// Raw executes the string SQL; each userID aligns with a ? in order. Scan fills rows —
+	// one conversationRow per result row matching the SELECT aliases (user_id, content, …).
 	if err := r.db.Raw(query, userID, userID, userID, userID).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 
 	out := make([]domain.ConversationSummary, 0, len(rows))
 	for _, row := range rows {
+		// Nested struct literals: map flat SQL row → domain.ConversationSummary with nested
+		// LastMessage (Content + CreatedAt together).
+		// append lengthens out by one — always assign: out = append(out, elt). Similar in spirit to
+		// [...prev, elt] spread in JS, but Go returns a slice you must capture.
 		out = append(out, domain.ConversationSummary{
 			UserID: row.UserID,
 			LastMessage: domain.LastMessage{

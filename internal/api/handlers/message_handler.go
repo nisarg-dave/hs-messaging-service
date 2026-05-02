@@ -25,8 +25,12 @@ func NewMessageHandler(messageService MessageService) *MessageHandler {
 }
 
 func (h *MessageHandler) CreateMessage(c *echo.Context) error {
+	// new(T) allocates a zero-valued T and returns *T — same usable pointer as &domain.Message{} here.
+	// new(&domain.Message{}) is invalid: new expects a type, not an expression.
 	message := new(domain.Message)
 
+	// Bind decodes the request body (JSON with Content-Type: application/json, etc.) into message —
+	// same conceptual idea as json.Unmarshal into a struct (“deserialize”).
 	err := c.Bind(message)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, err.Error())

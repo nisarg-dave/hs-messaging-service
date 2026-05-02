@@ -32,6 +32,8 @@ func (s *ConversationService) GetConversation(userID, otherID string) ([]domain.
 	return s.conversationRepository.GetConversation(userID, otherID)
 }
 
+// Package-level vars: visible to every file in package service regardless of declaration order.
+// Lower-case names stay inside this package only (not “global” across the module).
 var (
 	errEmptyUserID  = fmt.Errorf("userID is required")
 	errEmptyOtherID = fmt.Errorf("other userID is required")
