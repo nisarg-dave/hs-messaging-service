@@ -32,7 +32,7 @@ func (h *ConversationHandler) GetConversations(c *echo.Context) error {
 
 	conversations, err := h.conversationService.ListConversations(userID)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return writeServiceError(c, err)
 	}
 
 	return c.JSON(http.StatusOK, map[string]any{"conversations": conversations})
@@ -47,7 +47,7 @@ func (h *ConversationHandler) GetConversation(c *echo.Context) error {
 	otherID := c.Param("userId")
 	messages, err := h.conversationService.GetConversation(userID, otherID)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return writeServiceError(c, err)
 	}
 
 	return c.JSON(http.StatusOK, map[string]any{

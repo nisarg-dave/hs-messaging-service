@@ -25,20 +25,14 @@ func NewMessageHandler(messageService MessageService) *MessageHandler {
 }
 
 func (h *MessageHandler) CreateMessage(c *echo.Context) error {
-	// new(T) allocates a zero-valued T and returns *T — same usable pointer as &domain.Message{} here.
-	// new(&domain.Message{}) is invalid: new expects a type, not an expression.
 	message := new(domain.Message)
 
-	// Bind decodes the request body (JSON with Content-Type: application/json, etc.) into message —
-	// same conceptual idea as json.Unmarshal into a struct (“deserialize”).
-	err := c.Bind(message)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, err.Error())
+	if err := c.Bind(message); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
-	err = h.messageService.CreateMessage(message)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, err.Error())
+	if err := h.messageService.CreateMessage(message); err != nil {
+		return writeServiceError(c, err)
 	}
 
 	return c.JSON(http.StatusCreated, message)
@@ -48,7 +42,7 @@ func (h *MessageHandler) MarkMessageAsRead(c *echo.Context) error {
 	messageID := c.Param("id")
 	message, err := h.messageService.MarkMessageAsRead(messageID)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, err.Error())
+		return writeServiceError(c, err)
 	}
 	return c.JSON(http.StatusOK, message)
 }

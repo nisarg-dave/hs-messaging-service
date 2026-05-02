@@ -3,12 +3,14 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"hs-messaging-service/internal/domain"
+	"hs-messaging-service/internal/service"
 
 	"github.com/labstack/echo/v5"
 )
@@ -122,6 +124,19 @@ func TestConversationHandler_GetConversations_ServiceError(t *testing.T) {
 	}
 }
 
+func TestConversationHandler_GetConversations_ValidationError(t *testing.T) {
+	fake := &fakeConversationService{listErr: fmt.Errorf("list conversations: %w", service.ErrValidation)}
+	h := NewConversationHandler(fake)
+
+	c, rec := newConversationContext("/conversations", "user-1")
+	if err := h.GetConversations(c); err != nil {
+		t.Fatalf("GetConversations returned error: %v", err)
+	}
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status code = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
 func TestConversationHandler_GetConversation_Success(t *testing.T) {
 	fake := &fakeConversationService{
 		getReturn: []domain.Message{
@@ -187,5 +202,20 @@ func TestConversationHandler_GetConversation_ServiceError(t *testing.T) {
 	}
 	if rec.Code != http.StatusInternalServerError {
 		t.Errorf("status code = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+}
+
+func TestConversationHandler_GetConversation_ValidationError(t *testing.T) {
+	fake := &fakeConversationService{getErr: fmt.Errorf("get conversation: %w", service.ErrValidation)}
+	h := NewConversationHandler(fake)
+
+	c, rec := newConversationContext("/conversations/user-2", "user-1")
+	c.SetPathValues(echo.PathValues{{Name: "userId", Value: "user-2"}})
+
+	if err := h.GetConversation(c); err != nil {
+		t.Fatalf("GetConversation returned error: %v", err)
+	}
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status code = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 }

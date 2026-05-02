@@ -3,12 +3,14 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"hs-messaging-service/internal/domain"
+	"hs-messaging-service/internal/service"
 
 	"github.com/labstack/echo/v5"
 )
@@ -122,6 +124,31 @@ func TestMessageHandler_CreateMessage_ServiceError(t *testing.T) {
 	}
 }
 
+func TestMessageHandler_CreateMessage_ValidationError(t *testing.T) {
+	fake := &fakeMessageService{createErr: fmt.Errorf("create message: %w", service.ErrValidation)}
+	h := NewMessageHandler(fake)
+
+	body := `{"senderId":"s1","recipientId":"r1","content":"hello"}`
+	c, rec := newTestContext(http.MethodPost, "/messages", body)
+
+	if err := h.CreateMessage(c); err != nil {
+		t.Fatalf("CreateMessage returned error: %v", err)
+	}
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status code = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+	var got map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	// Comma-ok map lookup: ok is true only if the key is actually present.
+	// !ok means the "error" key was missing from the response body.
+	if _, ok := got["error"]; !ok {
+		t.Errorf("expected response body to have 'error' key, got %+v", got)
+	}
+}
+
 func TestMessageHandler_MarkMessageAsRead_Success(t *testing.T) {
 	fake := &fakeMessageService{
 		markReturnMsg: &domain.Message{ID: "abc", IsRead: true, Content: "hi"},
@@ -165,5 +192,20 @@ func TestMessageHandler_MarkMessageAsRead_ServiceError(t *testing.T) {
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Errorf("status code = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+}
+
+func TestMessageHandler_MarkMessageAsRead_ValidationError(t *testing.T) {
+	fake := &fakeMessageService{markErr: fmt.Errorf("mark message as read: %w", service.ErrValidation)}
+	h := NewMessageHandler(fake)
+
+	c, rec := newTestContext(http.MethodPatch, "/messages/bad/read", "")
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "bad"}})
+
+	if err := h.MarkMessageAsRead(c); err != nil {
+		t.Fatalf("MarkMessageAsRead returned error: %v", err)
+	}
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status code = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 }
