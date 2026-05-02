@@ -46,5 +46,5 @@ var (
 	errInvalidUUID      = fmt.Errorf("%w: must be a valid UUID", ErrValidation)
 	errSelfMessage      = fmt.Errorf("%w: senderId and recipientId must differ", ErrValidation)
 	errSelfConversation = fmt.Errorf("%w: cannot fetch conversation with self", ErrValidation)
-	errContentTooLong   = fmt.Errorf("%w: content exceeds %d characters", ErrValidation, maxContentLength)
+	errContentTooLong   = fmt.Errorf("%w: content exceeds %d bytes", ErrValidation, maxContentLength)
 )
