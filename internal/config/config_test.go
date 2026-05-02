@@ -14,6 +14,7 @@ func TestLoad(t *testing.T) {
 
 	expectedDatabaseURL := "host=localhost user=postgres password=secret dbname=messages port=5432 sslmode=disable"
 	if cfg.DatabaseURL != expectedDatabaseURL {
+		// %q prints quoted strings (see fmt)—handy for comparing strings with spaces or empties.
 		t.Errorf("DatabaseURL = %q, want %q", cfg.DatabaseURL, expectedDatabaseURL)
 	}
 

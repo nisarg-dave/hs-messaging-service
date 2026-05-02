@@ -1,5 +1,8 @@
 package handlers
 
+// map[string]string{"error": "..."} is a typed map literal; passing it to c.JSON produces
+// a JSON body like {"error":"..."}.
+
 import (
 	"net/http"
 
