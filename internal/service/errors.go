@@ -36,6 +36,14 @@ const maxContentLength = 4000
 // ErrValidation, so errors.Is returns false and the handler falls back to 500.
 var ErrValidation = errors.New("validation error")
 
+// ErrNotFound is the sentinel for "you asked for a resource that doesn't
+// exist". The service translates repository-specific not-found errors (e.g.
+// gorm.ErrRecordNotFound) into this so handlers can map it to HTTP 404
+// without importing GORM (forbidden by the layered-architecture rule).
+var ErrNotFound = errors.New("not found")
+
+var errMessageNotFound = fmt.Errorf("%w: message", ErrNotFound)
+
 var (
 	errEmptyUserID      = fmt.Errorf("%w: userID is required", ErrValidation)
 	errEmptyOtherID     = fmt.Errorf("%w: other userID is required", ErrValidation)

@@ -6,105 +6,204 @@ import (
 	"testing"
 
 	"hs-messaging-service/internal/domain"
+
+	"gorm.io/gorm"
 )
 
-// These tests exercise validation-only paths in MessageService. They rely on
-// the fact that validation runs before the repository is touched, so a nil
-// *postgres.MessageRepository never gets dereferenced. A future PR that
-// introduces a repo interface would let us cover success paths here too.
+// fakeMessageRepository implements the MessageRepository interface so we can
+// drive MessageService in unit tests without a real database.
+type fakeMessageRepository struct {
+	createCalledWith *domain.Message
+	createErr        error
 
-func newMessageServiceForValidation() *MessageService {
-	return &MessageService{messageRepository: nil}
+	markCalledWith string
+	markReturn     *domain.Message
+	markErr        error
+}
+
+func (f *fakeMessageRepository) CreateMessage(m *domain.Message) error {
+	// Snapshot a copy so tests can assert what the service passed in BEFORE
+	// the repo mutates the struct (the real Postgres repo fills in ID on
+	// insert, mirrored here).
+	snapshot := *m
+	f.createCalledWith = &snapshot
+	if f.createErr != nil {
+		return f.createErr
+	}
+	m.ID = "generated-id"
+	return nil
+}
+
+func (f *fakeMessageRepository) MarkMessageAsRead(id string) (*domain.Message, error) {
+	f.markCalledWith = id
+	if f.markErr != nil {
+		return nil, f.markErr
+	}
+	return f.markReturn, nil
 }
 
 func validUUID() string { return "11111111-1111-1111-1111-111111111111" }
-
 func otherUUID() string { return "22222222-2222-2222-2222-222222222222" }
 
-func TestValidateNewMessage_AllErrorsAreValidation(t *testing.T) {
+func validRequest() *CreateMessageRequest {
+	return &CreateMessageRequest{
+		SenderID:    validUUID(),
+		RecipientID: otherUUID(),
+		Content:     "hi",
+	}
+}
+
+func TestCreateMessage_Success(t *testing.T) {
+	repo := &fakeMessageRepository{}
+	svc := NewMessageService(repo)
+
+	msg, err := svc.CreateMessage(validRequest())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if msg.ID != "generated-id" {
+		t.Errorf("expected repo to fill ID, got %q", msg.ID)
+	}
+	if repo.createCalledWith == nil || repo.createCalledWith.Content != "hi" {
+		t.Errorf("repo not called with expected message: %+v", repo.createCalledWith)
+	}
+}
+
+func TestCreateMessage_StripsServerControlledFields(t *testing.T) {
+	// Even if a future caller sneaks server-controlled fields onto the DTO,
+	// the service should never propagate them. The DTO doesn't expose them
+	// at all, so this test mainly documents that the persisted domain.Message
+	// starts from a zero ID/IsRead/CreatedAt — letting the DB defaults win.
+	repo := &fakeMessageRepository{}
+	svc := NewMessageService(repo)
+
+	if _, err := svc.CreateMessage(validRequest()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if repo.createCalledWith.ID != "" {
+		t.Errorf("expected zero ID before insert, got %q", repo.createCalledWith.ID)
+	}
+	if repo.createCalledWith.IsRead {
+		t.Error("expected IsRead=false before insert")
+	}
+	if !repo.createCalledWith.CreatedAt.IsZero() {
+		t.Errorf("expected zero CreatedAt before insert, got %v", repo.createCalledWith.CreatedAt)
+	}
+}
+
+func TestCreateMessage_ContentAtMaxLengthIsAccepted(t *testing.T) {
+	repo := &fakeMessageRepository{}
+	svc := NewMessageService(repo)
+
+	req := validRequest()
+	req.Content = strings.Repeat("a", maxContentLength)
+
+	if _, err := svc.CreateMessage(req); err != nil {
+		t.Fatalf("expected content at exact max length to be accepted, got %v", err)
+	}
+}
+
+func TestCreateMessage_ValidationFailures(t *testing.T) {
 	cases := []struct {
 		name string
-		msg  *domain.Message
+		req  *CreateMessageRequest
 	}{
-		{"empty sender", &domain.Message{SenderID: "", RecipientID: validUUID(), Content: "hi"}},
-		{"empty recipient", &domain.Message{SenderID: validUUID(), RecipientID: "", Content: "hi"}},
-		{"empty content", &domain.Message{SenderID: validUUID(), RecipientID: otherUUID(), Content: ""}},
-		{"invalid sender uuid", &domain.Message{SenderID: "not-a-uuid", RecipientID: validUUID(), Content: "hi"}},
-		{"invalid recipient uuid", &domain.Message{SenderID: validUUID(), RecipientID: "not-a-uuid", Content: "hi"}},
-		{"invalid job uuid", &domain.Message{SenderID: validUUID(), RecipientID: otherUUID(), Content: "hi", JobID: ptr("nope")}},
-		{"self message", &domain.Message{SenderID: validUUID(), RecipientID: validUUID(), Content: "hi"}},
-		{"content too long", &domain.Message{SenderID: validUUID(), RecipientID: otherUUID(), Content: strings.Repeat("a", maxContentLength+1)}},
+		{"empty sender", &CreateMessageRequest{SenderID: "", RecipientID: validUUID(), Content: "hi"}},
+		{"empty recipient", &CreateMessageRequest{SenderID: validUUID(), RecipientID: "", Content: "hi"}},
+		{"empty content", &CreateMessageRequest{SenderID: validUUID(), RecipientID: otherUUID(), Content: ""}},
+		{"invalid sender uuid", &CreateMessageRequest{SenderID: "not-a-uuid", RecipientID: validUUID(), Content: "hi"}},
+		{"invalid recipient uuid", &CreateMessageRequest{SenderID: validUUID(), RecipientID: "not-a-uuid", Content: "hi"}},
+		{"invalid job uuid", &CreateMessageRequest{SenderID: validUUID(), RecipientID: otherUUID(), Content: "hi", JobID: ptr("nope")}},
+		{"self message", &CreateMessageRequest{SenderID: validUUID(), RecipientID: validUUID(), Content: "hi"}},
+		{"content too long", &CreateMessageRequest{SenderID: validUUID(), RecipientID: otherUUID(), Content: strings.Repeat("a", maxContentLength+1)}},
 	}
 
-	svc := newMessageServiceForValidation()
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := svc.CreateMessage(tc.msg)
+			repo := &fakeMessageRepository{}
+			svc := NewMessageService(repo)
+
+			_, err := svc.CreateMessage(tc.req)
 			if err == nil {
 				t.Fatal("expected validation error, got nil")
 			}
 			if !errors.Is(err, ErrValidation) {
 				t.Errorf("error %v should wrap ErrValidation", err)
 			}
+			if repo.createCalledWith != nil {
+				t.Error("validation should short-circuit before the repo is called")
+			}
 		})
 	}
 }
 
-func TestValidateNewMessage_ContentAtMaxLengthIsAccepted(t *testing.T) {
-	// We want to prove that content of exactly maxContentLength bytes passes
-	// validation. The service is built with a nil repository (see
-	// newMessageServiceForValidation), so once validation passes,
-	// CreateMessage will call s.messageRepository.CreateMessage(...) on a nil
-	// pointer, which crashes the goroutine via a runtime panic (Go's version
-	// of an unrecoverable error / unhandled exception in other languages).
-	//
-	// In Go you can intercept a panic with recover(), but recover() only
-	// works when called from a deferred function. `defer` schedules a
-	// function to run when the surrounding function returns -- including when
-	// it returns because of a panic. So the pattern below means:
-	//
-	//   1. Register a cleanup function that runs at the very end of the test.
-	//   2. Inside it, call recover(): if a panic is in flight, it stops the
-	//      panic and returns the panic value; if not, it returns nil.
-	//   3. We discard the value with `_ =` because we don't care which kind
-	//      of panic it was -- any panic here means we got past validation,
-	//      which is exactly what we wanted to prove.
-	//
-	// Without this defer+recover, the nil-pointer dereference would mark the
-	// test as FAILED even though validation behaved correctly.
-	svc := newMessageServiceForValidation()
-	msg := &domain.Message{
-		SenderID:    validUUID(),
-		RecipientID: otherUUID(),
-		Content:     strings.Repeat("a", maxContentLength),
+func TestCreateMessage_RepoErrorPropagates(t *testing.T) {
+	repo := &fakeMessageRepository{createErr: errors.New("db down")}
+	svc := NewMessageService(repo)
+
+	_, err := svc.CreateMessage(validRequest())
+	if err == nil {
+		t.Fatal("expected error from repo")
 	}
-	defer func() {
-		_ = recover()
-	}()
-	err := svc.CreateMessage(msg)
-	// We only reach this line if validation rejected the input before the
-	// repo call. In that case, assert it wasn't an ErrValidation rejection.
-	if err != nil && errors.Is(err, ErrValidation) {
-		t.Errorf("content of exact max length should not fail validation, got %v", err)
+	if errors.Is(err, ErrValidation) {
+		t.Errorf("repo error should not be classified as validation: %v", err)
+	}
+}
+
+func TestMarkMessageAsRead_Success(t *testing.T) {
+	want := &domain.Message{ID: validUUID(), IsRead: true}
+	repo := &fakeMessageRepository{markReturn: want}
+	svc := NewMessageService(repo)
+
+	got, err := svc.MarkMessageAsRead(validUUID())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != want {
+		t.Errorf("got %+v, want %+v", got, want)
 	}
 }
 
 func TestMarkMessageAsRead_Validation(t *testing.T) {
-	svc := newMessageServiceForValidation()
+	cases := []struct {
+		name string
+		id   string
+	}{
+		{"empty id", ""},
+		{"non-uuid id", "not-a-uuid"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := NewMessageService(&fakeMessageRepository{})
+			_, err := svc.MarkMessageAsRead(tc.id)
+			if err == nil || !errors.Is(err, ErrValidation) {
+				t.Errorf("expected validation error, got %v", err)
+			}
+		})
+	}
+}
 
-	t.Run("empty id", func(t *testing.T) {
-		_, err := svc.MarkMessageAsRead("")
-		if err == nil || !errors.Is(err, ErrValidation) {
-			t.Errorf("expected validation error, got %v", err)
-		}
-	})
+func TestMarkMessageAsRead_NotFound(t *testing.T) {
+	repo := &fakeMessageRepository{markErr: gorm.ErrRecordNotFound}
+	svc := NewMessageService(repo)
 
-	t.Run("non-uuid id", func(t *testing.T) {
-		_, err := svc.MarkMessageAsRead("not-a-uuid")
-		if err == nil || !errors.Is(err, ErrValidation) {
-			t.Errorf("expected validation error, got %v", err)
-		}
-	})
+	_, err := svc.MarkMessageAsRead(validUUID())
+	if err == nil || !errors.Is(err, ErrNotFound) {
+		t.Errorf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestMarkMessageAsRead_OtherRepoErrorPropagates(t *testing.T) {
+	repo := &fakeMessageRepository{markErr: errors.New("db down")}
+	svc := NewMessageService(repo)
+
+	_, err := svc.MarkMessageAsRead(validUUID())
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if errors.Is(err, ErrNotFound) || errors.Is(err, ErrValidation) {
+		t.Errorf("generic repo error should not be classified: %v", err)
+	}
 }
 
 func ptr(s string) *string { return &s }

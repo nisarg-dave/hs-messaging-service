@@ -15,23 +15,32 @@ import (
 	"github.com/labstack/echo/v5"
 )
 
-// fakeMessageService is a stand-in for the real service.
-// It satisfies the MessageService interface, so the handler accepts it.
-// Each field lets a test control what the fake returns.
+// fakeMessageService satisfies the MessageService interface so the handler
+// accepts it. Each field lets a test control what the fake returns.
 type fakeMessageService struct {
-	createErr error
+	createCalledWith *service.CreateMessageRequest
+	createReturn     *domain.Message
+	createErr        error
 
 	markCalledWithID string
 	markReturnMsg    *domain.Message
 	markErr          error
 }
 
-func (f *fakeMessageService) CreateMessage(message *domain.Message) error {
+func (f *fakeMessageService) CreateMessage(req *service.CreateMessageRequest) (*domain.Message, error) {
+	f.createCalledWith = req
 	if f.createErr != nil {
-		return f.createErr
+		return nil, f.createErr
 	}
-	message.ID = "fake-id"
-	return nil
+	if f.createReturn != nil {
+		return f.createReturn, nil
+	}
+	return &domain.Message{
+		ID:          "fake-id",
+		SenderID:    req.SenderID,
+		RecipientID: req.RecipientID,
+		Content:     req.Content,
+	}, nil
 }
 
 func (f *fakeMessageService) MarkMessageAsRead(messageID string) (*domain.Message, error) {
@@ -42,8 +51,6 @@ func (f *fakeMessageService) MarkMessageAsRead(messageID string) (*domain.Messag
 	return f.markReturnMsg, nil
 }
 
-// newTestContext builds an Echo context backed by httptest, similar to
-// what we did in conversation_handler_test.go.
 func newTestContext(method, target, body string) (*echo.Context, *httptest.ResponseRecorder) {
 	e := echo.New()
 	var reqBody *strings.Reader
@@ -61,9 +68,6 @@ func newTestContext(method, target, body string) (*echo.Context, *httptest.Respo
 	c := e.NewContext(req, rec)
 	return c, rec
 }
-
-// fmt verbs in assertions: %v default formatting (errors); %d integers (status codes);
-// %q quoted strings (nice for empties/diffs).
 
 func TestMessageHandler_CreateMessage_Success(t *testing.T) {
 	fake := &fakeMessageService{}
@@ -90,6 +94,34 @@ func TestMessageHandler_CreateMessage_Success(t *testing.T) {
 	}
 	if got.Content != "hello" {
 		t.Errorf("Content = %q, want %q", got.Content, "hello")
+	}
+}
+
+func TestMessageHandler_CreateMessage_IgnoresClientSuppliedServerFields(t *testing.T) {
+	// The handler binds into CreateMessageRequest, which has no fields for
+	// id/isRead/createdAt. Whatever the client sent for those keys should be
+	// silently dropped at the binding step.
+	fake := &fakeMessageService{}
+	h := NewMessageHandler(fake)
+
+	body := `{
+		"id": "spoofed",
+		"isRead": true,
+		"createdAt": "2020-01-01T00:00:00Z",
+		"senderId": "s1",
+		"recipientId": "r1",
+		"content": "hi"
+	}`
+	c, _ := newTestContext(http.MethodPost, "/messages", body)
+	if err := h.CreateMessage(c); err != nil {
+		t.Fatalf("CreateMessage returned error: %v", err)
+	}
+
+	if fake.createCalledWith == nil {
+		t.Fatal("expected service to be called")
+	}
+	if fake.createCalledWith.SenderID != "s1" || fake.createCalledWith.Content != "hi" {
+		t.Errorf("unexpected DTO: %+v", fake.createCalledWith)
 	}
 }
 
@@ -180,7 +212,7 @@ func TestMessageHandler_MarkMessageAsRead_Success(t *testing.T) {
 }
 
 func TestMessageHandler_MarkMessageAsRead_ServiceError(t *testing.T) {
-	fake := &fakeMessageService{markErr: errors.New("not found")}
+	fake := &fakeMessageService{markErr: errors.New("boom")}
 	h := NewMessageHandler(fake)
 
 	c, rec := newTestContext(http.MethodPatch, "/messages/missing/read", "")
@@ -207,5 +239,20 @@ func TestMessageHandler_MarkMessageAsRead_ValidationError(t *testing.T) {
 	}
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("status code = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestMessageHandler_MarkMessageAsRead_NotFound(t *testing.T) {
+	fake := &fakeMessageService{markErr: fmt.Errorf("mark message as read: %w", service.ErrNotFound)}
+	h := NewMessageHandler(fake)
+
+	c, rec := newTestContext(http.MethodPatch, "/messages/missing/read", "")
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "missing"}})
+
+	if err := h.MarkMessageAsRead(c); err != nil {
+		t.Fatalf("MarkMessageAsRead returned error: %v", err)
+	}
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("status code = %d, want %d", rec.Code, http.StatusNotFound)
 	}
 }

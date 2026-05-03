@@ -1,27 +1,61 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 
 	"hs-messaging-service/internal/domain"
-	"hs-messaging-service/internal/repository/postgres"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
-type MessageService struct {
-	messageRepository *postgres.MessageRepository
+// MessageRepository is the slice of repository behavior MessageService needs.
+// Defining it here (the consumer) lets tests inject fakes without dragging in
+// a real Postgres connection. *postgres.MessageRepository satisfies this
+// interface implicitly because it has matching method signatures.
+type MessageRepository interface {
+	CreateMessage(message *domain.Message) error
+	MarkMessageAsRead(messageID string) (*domain.Message, error)
 }
 
-func NewMessageService(messageRepository *postgres.MessageRepository) *MessageService {
+// CreateMessageRequest is the input shape the service accepts for creating a
+// new message. It deliberately omits server-controlled fields (ID, IsRead,
+// CreatedAt, UpdatedAt) so a malicious or buggy client can't spoof them. The
+// handler binds JSON into this struct and the service builds a domain.Message
+// from it before persisting.
+type CreateMessageRequest struct {
+	SenderID    string  `json:"senderId"`
+	RecipientID string  `json:"recipientId"`
+	Content     string  `json:"content"`
+	JobID       *string `json:"jobId,omitempty"`
+}
+
+type MessageService struct {
+	messageRepository MessageRepository
+}
+
+func NewMessageService(messageRepository MessageRepository) *MessageService {
 	return &MessageService{messageRepository: messageRepository}
 }
 
-func (s *MessageService) CreateMessage(message *domain.Message) error {
-	if err := validateNewMessage(message); err != nil {
-		return fmt.Errorf("create message: %w", err)
+// CreateMessage validates the request and, on success, persists a new message.
+// Returns the persisted domain.Message so callers can see the server-assigned
+// ID and timestamps.
+func (s *MessageService) CreateMessage(req *CreateMessageRequest) (*domain.Message, error) {
+	if err := validateCreateMessageRequest(req); err != nil {
+		return nil, fmt.Errorf("create message: %w", err)
 	}
-	return s.messageRepository.CreateMessage(message)
+	message := &domain.Message{
+		SenderID:    req.SenderID,
+		RecipientID: req.RecipientID,
+		Content:     req.Content,
+		JobID:       req.JobID,
+	}
+	if err := s.messageRepository.CreateMessage(message); err != nil {
+		return nil, fmt.Errorf("create message: %w", err)
+	}
+	return message, nil
 }
 
 func (s *MessageService) MarkMessageAsRead(messageID string) (*domain.Message, error) {
@@ -33,33 +67,38 @@ func (s *MessageService) MarkMessageAsRead(messageID string) (*domain.Message, e
 	}
 	message, err := s.messageRepository.MarkMessageAsRead(messageID)
 	if err != nil {
-		return nil, err
+		// Translate the GORM-specific not-found into our domain sentinel so
+		// the handler can map it to 404 without importing gorm.
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("mark message as read: %w", errMessageNotFound)
+		}
+		return nil, fmt.Errorf("mark message as read: %w", err)
 	}
 	return message, nil
 }
 
-func validateNewMessage(m *domain.Message) error {
-	if m == nil {
+func validateCreateMessageRequest(r *CreateMessageRequest) error {
+	if r == nil {
 		return errEmptyContent
 	}
 
-	_, senderErr := uuid.Parse(m.SenderID)
-	_, recipientErr := uuid.Parse(m.RecipientID)
+	_, senderErr := uuid.Parse(r.SenderID)
+	_, recipientErr := uuid.Parse(r.RecipientID)
 
 	switch {
-	case m.SenderID == "":
+	case r.SenderID == "":
 		return errEmptySenderID
-	case m.RecipientID == "":
+	case r.RecipientID == "":
 		return errEmptyRecipientID
-	case m.Content == "":
+	case r.Content == "":
 		return errEmptyContent
 	case senderErr != nil, recipientErr != nil:
 		return errInvalidUUID
-	case m.JobID != nil && !isUUID(*m.JobID):
+	case r.JobID != nil && !isUUID(*r.JobID):
 		return errInvalidUUID
-	case m.SenderID == m.RecipientID:
+	case r.SenderID == r.RecipientID:
 		return errSelfMessage
-	case len(m.Content) > maxContentLength:
+	case len(r.Content) > maxContentLength:
 		return errContentTooLong
 	}
 	return nil

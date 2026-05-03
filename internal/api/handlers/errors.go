@@ -10,11 +10,19 @@ import (
 )
 
 // writeServiceError maps an error returned from the service layer to a JSON
-// response. Validation errors (those wrapping service.ErrValidation) become
-// HTTP 400; everything else falls back to 500.
+// response. It walks the error chain with errors.Is so the wrapped operation
+// prefix (e.g. "create message: ...") doesn't hide the underlying sentinel.
+//
+//	service.ErrValidation -> 400 Bad Request
+//	service.ErrNotFound   -> 404 Not Found
+//	anything else         -> 500 Internal Server Error
 func writeServiceError(c *echo.Context, err error) error {
-	if errors.Is(err, service.ErrValidation) {
+	switch {
+	case errors.Is(err, service.ErrValidation):
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	case errors.Is(err, service.ErrNotFound):
+		return c.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
+	default:
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
-	return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 }

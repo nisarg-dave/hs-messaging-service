@@ -4,16 +4,23 @@ import (
 	"fmt"
 
 	"hs-messaging-service/internal/domain"
-	"hs-messaging-service/internal/repository/postgres"
 
 	"github.com/google/uuid"
 )
 
-type ConversationService struct {
-	conversationRepository *postgres.ConversationRepository
+// ConversationRepository is the slice of repository behavior
+// ConversationService needs. *postgres.ConversationRepository satisfies it
+// implicitly via matching method signatures.
+type ConversationRepository interface {
+	ListConversations(userID string) ([]domain.ConversationSummary, error)
+	GetConversation(userID, otherID string) ([]domain.Message, error)
 }
 
-func NewConversationService(conversationRepository *postgres.ConversationRepository) *ConversationService {
+type ConversationService struct {
+	conversationRepository ConversationRepository
+}
+
+func NewConversationService(conversationRepository ConversationRepository) *ConversationService {
 	return &ConversationService{conversationRepository: conversationRepository}
 }
 
