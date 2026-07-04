@@ -22,10 +22,11 @@ func main() {
 	// Pattern: Dependency Injection — same approach used for repositories and
 	// services; the logger is not a global singleton.
 	//
-	// TextHandler produces human-readable lines for local development. Use
-	// slog.NewJSONHandler instead in production so log aggregators (Datadog,
-	// CloudWatch, Loki, etc.) can parse structured key=value fields automatically.
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	// JSONHandler emits one JSON object per line. On ECS, stdout is captured by
+	// CloudWatch Logs, which can index structured fields (level, msg, messageId,
+	// etc.) for filtering and alerting. Use TextHandler only if you prefer
+	// human-readable output during local development.
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 	db, err := postgres.NewConnection(config)
 	if err != nil {
