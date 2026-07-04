@@ -3,7 +3,6 @@ package service
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 
 	"hs-messaging-service/internal/domain"
 
@@ -34,10 +33,14 @@ type CreateMessageRequest struct {
 
 type MessageService struct {
 	messageRepository MessageRepository
-	logger            *slog.Logger
+	logger            Logger
 }
 
-func NewMessageService(messageRepository MessageRepository, logger *slog.Logger) *MessageService {
+// NewMessageService wires dependencies via constructor injection (Composition
+// Root in cmd/api/main.go creates everything and passes it in). The logger
+// parameter satisfies the Logger interface — typically *slog.Logger in
+// production, a no-op fake in tests.
+func NewMessageService(messageRepository MessageRepository, logger Logger) *MessageService {
 	return &MessageService{messageRepository: messageRepository, logger: logger}
 }
 
@@ -57,6 +60,8 @@ func (s *MessageService) CreateMessage(req *CreateMessageRequest) (*domain.Messa
 	if err := s.messageRepository.CreateMessage(message); err != nil {
 		return nil, fmt.Errorf("create message: %w", err)
 	}
+	// Single Responsibility: logging lives in the service layer (business
+	// events), not in the repository (data access only).
 	s.logger.Info("message created",
 		"messageId", message.ID,
 		"senderId", message.SenderID,

@@ -17,7 +17,15 @@ import (
 func main() {
 	godotenv.Load()
 	config := config.Load()
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	// Composition Root: create shared dependencies once here and pass them down.
+	// Pattern: Dependency Injection — same approach used for repositories and
+	// services; the logger is not a global singleton.
+	//
+	// TextHandler produces human-readable lines for local development. Use
+	// slog.NewJSONHandler instead in production so log aggregators (Datadog,
+	// CloudWatch, Loki, etc.) can parse structured key=value fields automatically.
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 	db, err := postgres.NewConnection(config)
 	if err != nil {

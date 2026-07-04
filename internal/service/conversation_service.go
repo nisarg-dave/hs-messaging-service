@@ -2,7 +2,6 @@ package service
 
 import (
 	"fmt"
-	"log/slog"
 
 	"hs-messaging-service/internal/domain"
 
@@ -19,10 +18,12 @@ type ConversationRepository interface {
 
 type ConversationService struct {
 	conversationRepository ConversationRepository
-	logger                 *slog.Logger
+	logger                 Logger
 }
 
-func NewConversationService(conversationRepository ConversationRepository, logger *slog.Logger) *ConversationService {
+// NewConversationService wires dependencies via constructor injection — see
+// NewMessageService for the SOLID/pattern rationale.
+func NewConversationService(conversationRepository ConversationRepository, logger Logger) *ConversationService {
 	return &ConversationService{conversationRepository: conversationRepository, logger: logger}
 }
 
