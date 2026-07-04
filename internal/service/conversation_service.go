@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"log/slog"
 
 	"hs-messaging-service/internal/domain"
 
@@ -18,10 +19,11 @@ type ConversationRepository interface {
 
 type ConversationService struct {
 	conversationRepository ConversationRepository
+	logger                 *slog.Logger
 }
 
-func NewConversationService(conversationRepository ConversationRepository) *ConversationService {
-	return &ConversationService{conversationRepository: conversationRepository}
+func NewConversationService(conversationRepository ConversationRepository, logger *slog.Logger) *ConversationService {
+	return &ConversationService{conversationRepository: conversationRepository, logger: logger}
 }
 
 func (s *ConversationService) ListConversations(userID string) ([]domain.ConversationSummary, error) {
@@ -31,7 +33,12 @@ func (s *ConversationService) ListConversations(userID string) ([]domain.Convers
 	if _, err := uuid.Parse(userID); err != nil {
 		return nil, fmt.Errorf("list conversations: %w", errInvalidUUID)
 	}
-	return s.conversationRepository.ListConversations(userID)
+	summaries, err := s.conversationRepository.ListConversations(userID)
+	if err != nil {
+		return nil, err
+	}
+	s.logger.Info("conversations listed", "userId", userID, "count", len(summaries))
+	return summaries, nil
 }
 
 func (s *ConversationService) GetConversation(userID, otherID string) ([]domain.Message, error) {
@@ -50,5 +57,14 @@ func (s *ConversationService) GetConversation(userID, otherID string) ([]domain.
 	if userID == otherID {
 		return nil, fmt.Errorf("get conversation: %w", errSelfConversation)
 	}
-	return s.conversationRepository.GetConversation(userID, otherID)
+	messages, err := s.conversationRepository.GetConversation(userID, otherID)
+	if err != nil {
+		return nil, err
+	}
+	s.logger.Info("conversation retrieved",
+		"userId", userID,
+		"otherId", otherID,
+		"messageCount", len(messages),
+	)
+	return messages, nil
 }

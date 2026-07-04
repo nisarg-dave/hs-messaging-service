@@ -32,7 +32,7 @@ func (f *fakeConversationRepository) GetConversation(userID, otherID string) ([]
 func TestListConversations_Success(t *testing.T) {
 	want := []domain.ConversationSummary{{UserID: otherUUID(), UnreadCount: 3}}
 	repo := &fakeConversationRepository{listReturn: want}
-	svc := NewConversationService(repo)
+	svc := NewConversationService(repo, testLogger())
 
 	got, err := svc.ListConversations(validUUID())
 	if err != nil {
@@ -57,7 +57,7 @@ func TestListConversations_Validation(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := &fakeConversationRepository{}
-			svc := NewConversationService(repo)
+			svc := NewConversationService(repo, testLogger())
 			_, err := svc.ListConversations(tc.userID)
 			if err == nil || !errors.Is(err, ErrValidation) {
 				t.Errorf("expected validation error, got %v", err)
@@ -72,7 +72,7 @@ func TestListConversations_Validation(t *testing.T) {
 func TestGetConversation_Success(t *testing.T) {
 	want := []domain.Message{{ID: "m1", Content: "hi"}}
 	repo := &fakeConversationRepository{getReturn: want}
-	svc := NewConversationService(repo)
+	svc := NewConversationService(repo, testLogger())
 
 	got, err := svc.GetConversation(validUUID(), otherUUID())
 	if err != nil {
@@ -97,7 +97,7 @@ func TestGetConversation_Validation(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := &fakeConversationRepository{}
-			svc := NewConversationService(repo)
+			svc := NewConversationService(repo, testLogger())
 			_, err := svc.GetConversation(tc.userID, tc.otherID)
 			if err == nil || !errors.Is(err, ErrValidation) {
 				t.Errorf("expected validation error, got %v", err)

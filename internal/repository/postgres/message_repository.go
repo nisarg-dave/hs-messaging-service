@@ -1,8 +1,6 @@
 package postgres
 
 import (
-	"log"
-
 	"hs-messaging-service/internal/domain"
 
 	"gorm.io/gorm"
@@ -21,8 +19,6 @@ func (r *MessageRepository) CreateMessage(message *domain.Message) error {
 	if result.Error != nil {
 		return result.Error
 	}
-
-	log.Printf("Inserted %d rows", result.RowsAffected)
 	return nil
 }
 
@@ -31,8 +27,6 @@ func (r *MessageRepository) MarkMessageAsRead(messageID string) (*domain.Message
 	if result.Error != nil {
 		return nil, result.Error
 	}
-
-	log.Printf("Marked message as read: %s", messageID)
 
 	message := new(domain.Message)
 	result = r.db.First(&message, "id = ?", messageID)
