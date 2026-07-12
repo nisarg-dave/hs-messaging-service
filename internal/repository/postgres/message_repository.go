@@ -28,6 +28,11 @@ func (r *MessageRepository) MarkMessageAsRead(messageID string) (*domain.Message
 		return nil, result.Error
 	}
 
+	// new(T) allocates a zero-value T on the heap and returns *T.
+	// So new(domain.Message) is equivalent to &domain.Message{} — both give
+	// a pointer to an empty Message that GORM's First can fill in.
+	// First takes a destination pointer; message is already *Message, so
+	// &message is **Message — GORM accepts that and writes into *message.
 	message := new(domain.Message)
 	result = r.db.First(&message, "id = ?", messageID)
 	if result.Error != nil {
