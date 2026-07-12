@@ -6,6 +6,7 @@ package handlers
 import (
 	"net/http"
 
+	"hs-messaging-service/internal/api/middleware"
 	"hs-messaging-service/internal/domain"
 
 	"github.com/labstack/echo/v5"
@@ -25,8 +26,9 @@ func NewConversationHandler(conversationService ConversationService) *Conversati
 }
 
 func (h *ConversationHandler) GetConversations(c *echo.Context) error {
-	userID := c.Request().Header.Get("X-User-Id")
+	userID := middleware.UserIDFromContext(c)
 	if userID == "" {
+		// Defensive guard: routes normally run RequireUserID middleware first.
 		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "X-User-Id header is required"})
 	}
 
@@ -39,8 +41,9 @@ func (h *ConversationHandler) GetConversations(c *echo.Context) error {
 }
 
 func (h *ConversationHandler) GetConversation(c *echo.Context) error {
-	userID := c.Request().Header.Get("X-User-Id")
+	userID := middleware.UserIDFromContext(c)
 	if userID == "" {
+		// Defensive guard: routes normally run RequireUserID middleware first.
 		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "X-User-Id header is required"})
 	}
 

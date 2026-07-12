@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"hs-messaging-service/internal/api/middleware"
 	"hs-messaging-service/internal/domain"
 	"hs-messaging-service/internal/service"
 
@@ -43,14 +44,14 @@ func (f *fakeConversationService) GetConversation(userID, otherID string) ([]dom
 	return f.getReturn, nil
 }
 
-func newConversationContext(target, userIDHeader string) (*echo.Context, *httptest.ResponseRecorder) {
+func newConversationContext(target, userID string) (*echo.Context, *httptest.ResponseRecorder) {
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, target, nil)
-	if userIDHeader != "" {
-		req.Header.Set("X-User-Id", userIDHeader)
-	}
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
+	if userID != "" {
+		c.Set(middleware.UserIDContextKey, userID)
+	}
 	return c, rec
 }
 
