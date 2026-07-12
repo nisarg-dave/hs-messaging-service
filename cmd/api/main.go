@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"hs-messaging-service/internal/api/handlers"
+	"hs-messaging-service/internal/api/middleware"
 	"hs-messaging-service/internal/api/routes"
 	"hs-messaging-service/internal/config"
 	"hs-messaging-service/internal/repository/postgres"
@@ -43,6 +44,8 @@ func main() {
 	conversationHandler := handlers.NewConversationHandler(conversationService)
 
 	e := echo.New()
+	// Decorator pattern: middleware wraps every route without changing handler code.
+	e.Use(middleware.RequestLogger(logger))
 
 	routes.RegisterMessageRoutes(e, messageHandler)
 	routes.RegisterConversationRoutes(e, conversationHandler)
