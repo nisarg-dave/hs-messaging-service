@@ -43,6 +43,9 @@ func NewMessageService(messageRepository MessageRepository) *MessageService {
 // Returns the persisted domain.Message so callers can see the server-assigned
 // ID and timestamps.
 func (s *MessageService) CreateMessage(req *CreateMessageRequest) (*domain.Message, error) {
+	// (s *MessageService) above is a method receiver: this is a method on
+	// *MessageService, so you call it as svc.CreateMessage(...). The receiver s
+	// is the instance the method runs on (like "this" in other languages).
 	if err := validateCreateMessageRequest(req); err != nil {
 		return nil, fmt.Errorf("create message: %w", err)
 	}
@@ -62,7 +65,7 @@ func (s *MessageService) MarkMessageAsRead(messageID string) (*domain.Message, e
 	if messageID == "" {
 		return nil, fmt.Errorf("mark message as read: %w", errEmptyMessageID)
 	}
-	if _, err := uuid.Parse(messageID); err != nil {
+	if !isUUID(messageID) {
 		return nil, fmt.Errorf("mark message as read: %w", errInvalidUUID)
 	}
 	message, err := s.messageRepository.MarkMessageAsRead(messageID)
@@ -82,9 +85,8 @@ func validateCreateMessageRequest(r *CreateMessageRequest) error {
 		return errEmptyContent
 	}
 
-	_, senderErr := uuid.Parse(r.SenderID)
-	_, recipientErr := uuid.Parse(r.RecipientID)
-
+	// Empty checks first, then isUUID for format — same helper JobID already
+	// uses. Parsing into discarded errors beforehand was redundant.
 	switch {
 	case r.SenderID == "":
 		return errEmptySenderID
@@ -92,7 +94,7 @@ func validateCreateMessageRequest(r *CreateMessageRequest) error {
 		return errEmptyRecipientID
 	case r.Content == "":
 		return errEmptyContent
-	case senderErr != nil, recipientErr != nil:
+	case !isUUID(r.SenderID), !isUUID(r.RecipientID):
 		return errInvalidUUID
 	case r.JobID != nil && !isUUID(*r.JobID):
 		return errInvalidUUID

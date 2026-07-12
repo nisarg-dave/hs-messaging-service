@@ -51,6 +51,22 @@ func (f *fakeMessageService) MarkMessageAsRead(messageID string) (*domain.Messag
 	return f.markReturnMsg, nil
 }
 
+// newTestContext builds a fake Echo request/response pair for unit tests so
+// we can call handlers without starting a real HTTP server.
+//
+//	method / target — HTTP verb and URL path (e.g. POST, "/messages")
+//	body            — optional JSON string; empty means no request body
+//
+// Returns:
+//
+//	c   — *echo.Context the handler reads (params, bind JSON, etc.)
+//	rec — *httptest.ResponseRecorder that captures status code and response body
+//
+// strings.Reader / strings.NewReader(body): httptest.NewRequest's third
+// argument is an io.Reader (the request body stream). A plain string is not
+// an io.Reader, so NewReader wraps the string as a readable byte stream —
+// same role as Readable.from(body) or a Buffer in Node. When body is empty
+// we pass nil instead (no body).
 func newTestContext(method, target, body string) (*echo.Context, *httptest.ResponseRecorder) {
 	e := echo.New()
 	var reqBody *strings.Reader

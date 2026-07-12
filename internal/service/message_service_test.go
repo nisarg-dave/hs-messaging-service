@@ -22,9 +22,18 @@ type fakeMessageRepository struct {
 }
 
 func (f *fakeMessageRepository) CreateMessage(m *domain.Message) error {
-	// Snapshot a copy so tests can assert what the service passed in BEFORE
-	// the repo mutates the struct (the real Postgres repo fills in ID on
-	// insert, mirrored here).
+	// Snapshot so tests can assert what the service passed in BEFORE we
+	// mutate m below (real Postgres fills ID on insert; we mirror that).
+	//
+	//   snapshot := *m
+	//     *m dereferences the pointer: copy the Message value into snapshot.
+	//     After this, snapshot is a separate struct — changing m later does
+	//     not change snapshot.
+	//
+	//   f.createCalledWith = &snapshot
+	//     take the address of that copy and store the *domain.Message.
+	//     We are NOT "getting the address of a pointer"; we dereference once
+	//     to copy, then take the address of the copy.
 	snapshot := *m
 	f.createCalledWith = &snapshot
 	if f.createErr != nil {
@@ -41,9 +50,6 @@ func (f *fakeMessageRepository) MarkMessageAsRead(id string) (*domain.Message, e
 	}
 	return f.markReturn, nil
 }
-
-func validUUID() string { return "11111111-1111-1111-1111-111111111111" }
-func otherUUID() string { return "22222222-2222-2222-2222-222222222222" }
 
 func validRequest() *CreateMessageRequest {
 	return &CreateMessageRequest{
