@@ -79,6 +79,11 @@ ORDER BY r.created_at DESC
 		return nil, err
 	}
 
+	// make([]T, length, capacity) builds a slice. Here length is 0 (nothing
+	// in it yet) and capacity is len(rows) so append won't need to grow the
+	// underlying array as we loop — one allocation for the whole result.
+	// Equivalent idea in JS: new Array(n) then push, but Go keeps length and
+	// capacity separate.
 	out := make([]domain.ConversationSummary, 0, len(rows))
 	for _, row := range rows {
 		// Nested struct literals: map flat SQL row → domain.ConversationSummary with nested
