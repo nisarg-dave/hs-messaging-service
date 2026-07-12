@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"hs-messaging-service/internal/domain"
+	"hs-messaging-service/internal/logging"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -33,14 +34,14 @@ type CreateMessageRequest struct {
 
 type MessageService struct {
 	messageRepository MessageRepository
-	logger            Logger
+	logger            logging.Logger
 }
 
 // NewMessageService wires dependencies via constructor injection (Composition
 // Root in cmd/api/main.go creates everything and passes it in). The logger
-// parameter satisfies the Logger interface — typically *slog.Logger in
-// production, a no-op fake in tests.
-func NewMessageService(messageRepository MessageRepository, logger Logger) *MessageService {
+// parameter satisfies logging.Logger — typically *slog.Logger in production,
+// a no-op fake in tests.
+func NewMessageService(messageRepository MessageRepository, logger logging.Logger) *MessageService {
 	return &MessageService{messageRepository: messageRepository, logger: logger}
 }
 

@@ -1,8 +1,9 @@
 package middleware
 
 import (
-	"log/slog"
 	"time"
+
+	"hs-messaging-service/internal/logging"
 
 	"github.com/labstack/echo/v5"
 )
@@ -15,8 +16,10 @@ import (
 // SOLID: Single Responsibility — handlers keep business concerns; request logging lives in one place.
 // Open/Closed — new cross-cutting behavior is added by composing middleware, not editing handlers.
 //
-// Dependency Injection: the logger is passed in from the composition root (main), not a global.
-func RequestLogger(logger *slog.Logger) echo.MiddlewareFunc {
+// Dependency Injection: logging.Logger is passed in from the composition root (main), not a global.
+// The interface lives in internal/logging so both middleware and services share one contract
+// without either layer importing the other.
+func RequestLogger(logger logging.Logger) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
 			start := time.Now()
