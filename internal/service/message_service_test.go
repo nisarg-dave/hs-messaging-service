@@ -61,7 +61,7 @@ func validRequest() *CreateMessageRequest {
 
 func TestCreateMessage_Success(t *testing.T) {
 	repo := &fakeMessageRepository{}
-	svc := NewMessageService(repo)
+	svc := NewMessageService(repo, testLogger())
 
 	msg, err := svc.CreateMessage(validRequest())
 	if err != nil {
@@ -81,7 +81,7 @@ func TestCreateMessage_StripsServerControlledFields(t *testing.T) {
 	// at all, so this test mainly documents that the persisted domain.Message
 	// starts from a zero ID/IsRead/CreatedAt — letting the DB defaults win.
 	repo := &fakeMessageRepository{}
-	svc := NewMessageService(repo)
+	svc := NewMessageService(repo, testLogger())
 
 	if _, err := svc.CreateMessage(validRequest()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -99,7 +99,7 @@ func TestCreateMessage_StripsServerControlledFields(t *testing.T) {
 
 func TestCreateMessage_ContentAtMaxLengthIsAccepted(t *testing.T) {
 	repo := &fakeMessageRepository{}
-	svc := NewMessageService(repo)
+	svc := NewMessageService(repo, testLogger())
 
 	req := validRequest()
 	req.Content = strings.Repeat("a", maxContentLength)
@@ -127,7 +127,7 @@ func TestCreateMessage_ValidationFailures(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := &fakeMessageRepository{}
-			svc := NewMessageService(repo)
+			svc := NewMessageService(repo, testLogger())
 
 			_, err := svc.CreateMessage(tc.req)
 			if err == nil {
@@ -145,7 +145,7 @@ func TestCreateMessage_ValidationFailures(t *testing.T) {
 
 func TestCreateMessage_RepoErrorPropagates(t *testing.T) {
 	repo := &fakeMessageRepository{createErr: errors.New("db down")}
-	svc := NewMessageService(repo)
+	svc := NewMessageService(repo, testLogger())
 
 	_, err := svc.CreateMessage(validRequest())
 	if err == nil {
@@ -159,7 +159,7 @@ func TestCreateMessage_RepoErrorPropagates(t *testing.T) {
 func TestMarkMessageAsRead_Success(t *testing.T) {
 	want := &domain.Message{ID: validUUID(), IsRead: true}
 	repo := &fakeMessageRepository{markReturn: want}
-	svc := NewMessageService(repo)
+	svc := NewMessageService(repo, testLogger())
 
 	got, err := svc.MarkMessageAsRead(validUUID())
 	if err != nil {
@@ -180,7 +180,7 @@ func TestMarkMessageAsRead_Validation(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			svc := NewMessageService(&fakeMessageRepository{})
+			svc := NewMessageService(&fakeMessageRepository{}, testLogger())
 			_, err := svc.MarkMessageAsRead(tc.id)
 			if err == nil || !errors.Is(err, ErrValidation) {
 				t.Errorf("expected validation error, got %v", err)
@@ -191,7 +191,7 @@ func TestMarkMessageAsRead_Validation(t *testing.T) {
 
 func TestMarkMessageAsRead_NotFound(t *testing.T) {
 	repo := &fakeMessageRepository{markErr: gorm.ErrRecordNotFound}
-	svc := NewMessageService(repo)
+	svc := NewMessageService(repo, testLogger())
 
 	_, err := svc.MarkMessageAsRead(validUUID())
 	if err == nil || !errors.Is(err, ErrNotFound) {
@@ -201,7 +201,7 @@ func TestMarkMessageAsRead_NotFound(t *testing.T) {
 
 func TestMarkMessageAsRead_OtherRepoErrorPropagates(t *testing.T) {
 	repo := &fakeMessageRepository{markErr: errors.New("db down")}
-	svc := NewMessageService(repo)
+	svc := NewMessageService(repo, testLogger())
 
 	_, err := svc.MarkMessageAsRead(validUUID())
 	if err == nil {

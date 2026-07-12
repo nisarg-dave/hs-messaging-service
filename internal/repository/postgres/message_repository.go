@@ -1,8 +1,6 @@
 package postgres
 
 import (
-	"log"
-
 	"hs-messaging-service/internal/domain"
 
 	"gorm.io/gorm"
@@ -21,8 +19,6 @@ func (r *MessageRepository) CreateMessage(message *domain.Message) error {
 	if result.Error != nil {
 		return result.Error
 	}
-
-	log.Printf("Inserted %d rows", result.RowsAffected)
 	return nil
 }
 
@@ -31,8 +27,6 @@ func (r *MessageRepository) MarkMessageAsRead(messageID string) (*domain.Message
 	if result.Error != nil {
 		return nil, result.Error
 	}
-
-	log.Printf("Marked message as read: %s", messageID)
 
 	// new(T) allocates a zero-value T on the heap and returns *T.
 	// So new(domain.Message) is equivalent to &domain.Message{} — both give

@@ -1,7 +1,8 @@
 package main
 
 import (
-	"log"
+	"log/slog"
+	"os"
 
 	"hs-messaging-service/internal/api/handlers"
 	"hs-messaging-service/internal/api/routes"
@@ -16,17 +17,29 @@ import (
 func main() {
 	godotenv.Load()
 	config := config.Load()
+
+	// Composition Root: create shared dependencies once here and pass them down.
+	// Pattern: Dependency Injection — same approach used for repositories and
+	// services; the logger is not a global singleton.
+	//
+	// JSONHandler emits one JSON object per line. On ECS, stdout is captured by
+	// CloudWatch Logs, which can index structured fields (level, msg, messageId,
+	// etc.) for filtering and alerting. Use TextHandler only if you prefer
+	// human-readable output during local development.
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
 	db, err := postgres.NewConnection(config)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		logger.Error("failed to connect to database", "error", err)
+		os.Exit(1)
 	}
 
 	messageRepository := postgres.NewMessageRepository(db)
-	messageService := service.NewMessageService(messageRepository)
+	messageService := service.NewMessageService(messageRepository, logger)
 	messageHandler := handlers.NewMessageHandler(messageService)
 
 	conversationRepository := postgres.NewConversationRepository(db)
-	conversationService := service.NewConversationService(conversationRepository)
+	conversationService := service.NewConversationService(conversationRepository, logger)
 	conversationHandler := handlers.NewConversationHandler(conversationService)
 
 	e := echo.New()
@@ -34,8 +47,9 @@ func main() {
 	routes.RegisterMessageRoutes(e, messageHandler)
 	routes.RegisterConversationRoutes(e, conversationHandler)
 
-	log.Printf("Server started on port %s", config.ServerPort)
+	logger.Info("server started", "port", config.ServerPort)
 	if err := e.Start(":" + config.ServerPort); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+		logger.Error("failed to start server", "error", err)
+		os.Exit(1)
 	}
 }

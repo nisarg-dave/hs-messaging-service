@@ -33,10 +33,15 @@ type CreateMessageRequest struct {
 
 type MessageService struct {
 	messageRepository MessageRepository
+	logger            Logger
 }
 
-func NewMessageService(messageRepository MessageRepository) *MessageService {
-	return &MessageService{messageRepository: messageRepository}
+// NewMessageService wires dependencies via constructor injection (Composition
+// Root in cmd/api/main.go creates everything and passes it in). The logger
+// parameter satisfies the Logger interface — typically *slog.Logger in
+// production, a no-op fake in tests.
+func NewMessageService(messageRepository MessageRepository, logger Logger) *MessageService {
+	return &MessageService{messageRepository: messageRepository, logger: logger}
 }
 
 // CreateMessage validates the request and, on success, persists a new message.
@@ -58,6 +63,13 @@ func (s *MessageService) CreateMessage(req *CreateMessageRequest) (*domain.Messa
 	if err := s.messageRepository.CreateMessage(message); err != nil {
 		return nil, fmt.Errorf("create message: %w", err)
 	}
+	// Single Responsibility: logging lives in the service layer (business
+	// events), not in the repository (data access only).
+	s.logger.Info("message created",
+		"messageId", message.ID,
+		"senderId", message.SenderID,
+		"recipientId", message.RecipientID,
+	)
 	return message, nil
 }
 
@@ -77,6 +89,7 @@ func (s *MessageService) MarkMessageAsRead(messageID string) (*domain.Message, e
 		}
 		return nil, fmt.Errorf("mark message as read: %w", err)
 	}
+	s.logger.Info("message marked as read", "messageId", message.ID)
 	return message, nil
 }
 
