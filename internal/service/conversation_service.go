@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"hs-messaging-service/internal/domain"
+	"hs-messaging-service/internal/logging"
 
 	"github.com/google/uuid"
 )
@@ -18,12 +19,12 @@ type ConversationRepository interface {
 
 type ConversationService struct {
 	conversationRepository ConversationRepository
-	logger                 Logger
+	logger                 logging.Logger
 }
 
 // NewConversationService wires dependencies via constructor injection — see
 // NewMessageService for the SOLID/pattern rationale.
-func NewConversationService(conversationRepository ConversationRepository, logger Logger) *ConversationService {
+func NewConversationService(conversationRepository ConversationRepository, logger logging.Logger) *ConversationService {
 	return &ConversationService{conversationRepository: conversationRepository, logger: logger}
 }
 
